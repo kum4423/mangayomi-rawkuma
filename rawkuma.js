@@ -81,10 +81,16 @@ class DefaultExtension extends MProvider {
         return { imageUrl: metadata.image?.url || doc.selectFirst("img.wp-post-image")?.getSrc, description: metadata.description || "", author: metadata.author?.name || "", genre: metadata.genre || [], status: this.statusCode(metadata.creativeWorkStatus), chapters };
     }
     async getPageList(url) {
+        // The site has migrated CDNs at least once: recent chapters serve images from
+        // kuma.kyut.dev/wp-content/scr/..., while older chapters (pre-migration) still
+        // serve from the legacy rcdn.kyut.dev/images/... host. Both must be matched or
+        // every chapter still on the old CDN returns an empty page list (the reported bug).
         const chapterUrl = this.absoluteUrl(url), res = await this.client.get(chapterUrl, this.getHeaders(chapterUrl)), pages = [];
         for (const image of new Document(res.body).select("img[src]")) {
             const imageUrl = image.getSrc;
-            if (imageUrl && imageUrl.includes("kuma.kyut.dev/wp-content/scr/")) pages.push({ url: imageUrl, headers: this.getHeaders(imageUrl) });
+            if (imageUrl && (imageUrl.includes("kuma.kyut.dev/wp-content/scr/") || imageUrl.includes("rcdn.kyut.dev/images/"))) {
+                pages.push({ url: imageUrl, headers: this.getHeaders(imageUrl) });
+            }
         }
         return pages;
     }
