@@ -29,7 +29,24 @@ class DefaultExtension extends MProvider {
         }
         return { list, hasNextPage: doc.selectFirst("a:contains(Next)") != null };
     }
-    async getPopular(page) { return this.mangaList(`${this.source.baseUrl}/latest-update/?the_page=${page}`); }
+    async getPopular(page) {
+        // "Popular Today" is a homepage carousel (.trending-slider) with a fixed set of
+        // items and no pagination endpoint. Titles containing double quotes break the
+        // img[alt] attribute (e.g. alt="...Hazure Skill " tame"="" o=""...), so unlike
+        // mangaList() we read the manga name from the <a title="..."> attribute instead,
+        // which is properly HTML-entity escaped.
+        if (page > 1) return { list: [], hasNextPage: false };
+        const res = await this.client.get(this.source.baseUrl, this.getHeaders(this.source.baseUrl));
+        const doc = new Document(res.body);
+        const list = [];
+        for (const item of doc.select(".trending-slider a[href*='/manga/']")) {
+            const link = item.getHref;
+            const imageUrl = item.selectFirst("img.cover-image")?.getSrc;
+            const name = item.attr("title")?.trim() || item.selectFirst("h4")?.text?.trim();
+            if (name && imageUrl && link) list.push({ name, imageUrl, link });
+        }
+        return { list, hasNextPage: false };
+    }
     async getLatestUpdates(page) { return this.mangaList(`${this.source.baseUrl}/latest-update/?the_page=${page}`); }
     async search(query, page, filters) {
         if (!query.trim()) return this.getLatestUpdates(page);
