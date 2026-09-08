@@ -48,6 +48,38 @@ class DefaultExtension extends MProvider {
         return { list, hasNextPage: false };
     }
     async getLatestUpdates(page) { return this.mangaList(`${this.source.baseUrl}/latest-update/?the_page=${page}`); }
+    getFilterList() {
+        // Extracted from the /library/ filter panel (#nav-filter) via DevTools.
+        // NOTE: how these translate into an actual request is not wired up yet in
+        // search() -- the /library/ filtering UI renders its results client-side
+        // (confirmed: GET params like ?orderby=popular did not change the static
+        // HTML), so the real request format (endpoint, method, params) still needs
+        // to be captured from the Network tab before this can drive search().
+        // [slug, label] pairs, captured directly from #genre-filter's data-genre attributes
+        // (via a console script that scrolled the virtual-scroll list). Kept as explicit
+        // pairs -- not re-derived from the label -- because the site's own data has at
+        // least one duplicate label with distinct slugs ("thriller" / "thriller-2", both
+        // labelled "Thriller").
+        const genrePairs = [["action", "Action"], ["adaptions", "Adaptions"], ["adult", "Adult"], ["adventure", "Adventure"],
+            ["animals", "Animals"], ["comedy", "Comedy"], ["crime", "Crime"], ["drama", "Drama"], ["ecchi", "Ecchi"],
+            ["fantasy", "Fantasy"], ["game", "Game"], ["gender-bender", "Gender Bender"], ["girls-love", "Girls' Love"],
+            ["harem", "Harem"], ["hentai", "Hentai"], ["historical", "Historical"], ["horror", "Horror"], ["isekai", "isekai"],
+            ["josei", "Josei"], ["lolicon", "Lolicon"], ["magic", "magic"], ["martial-arts", "Martial Arts"], ["mature", "Mature"],
+            ["mecha", "Mecha"], ["mystery", "Mystery"], ["oneshot", "Oneshot"], ["philosophical", "Philosophical"],
+            ["police", "Police"], ["psychological", "Psychological"], ["romance", "Romance"], ["school-life", "School Life"],
+            ["sci-fi", "Sci-fi"], ["seinen", "Seinen"], ["shotacon", "Shotacon"], ["shoujo", "Shoujo"], ["shoujo-ai", "Shoujo Ai"],
+            ["shounen", "Shounen"], ["shounen-ai", "Shounen Ai"], ["slice-of-life", "Slice of Life"], ["smut", "Smut"],
+            ["sports", "Sports"], ["supernatural", "Supernatural"], ["thriller", "Thriller"], ["thriller-2", "Thriller"],
+            ["tragedy", "Tragedy"], ["yaoi", "Yaoi"], ["yuri", "Yuri"]];
+        const triStatePair = ([value, name]) => ({ type_name: "TriState", name, value, state: 0 });
+        const triState = (name) => triStatePair([name.toLowerCase().replace(/\s+/g, "-"), name]);
+        return [
+            { type_name: "GroupFilter", name: "Genre", state: genrePairs.map(triStatePair) },
+            { type_name: "GroupFilter", name: "Type", state: ["Manga", "Manhua", "Manhwa", "Novel"].map(triState) },
+            { type_name: "GroupFilter", name: "Status", state: ["Cancelled", "Completed", "On Hiatus", "Ongoing", "Unknown"].map(triState) },
+            { type_name: "SortFilter", name: "Sort By", state: { index: 0, ascending: false, type_name: "SortState" }, values: ["Popular", "Rating", "Updated", "Bookmarked", "Title"] },
+        ];
+    }
     async search(query, page, filters) {
         if (!query.trim()) return this.getLatestUpdates(page);
         const home = await this.client.get(this.source.baseUrl, this.getHeaders(this.source.baseUrl));
