@@ -18,6 +18,7 @@ const mangayomiSources = [{
 // network log. Kept here (off) for future troubleshooting -- flip to true if
 // getPopular/getLatestUpdates/search ever return an empty list unexpectedly again.
 const DEBUG = false;
+const DEBUG_FILTERS = false;
 
 class DefaultExtension extends MProvider {
     constructor() { super(); this.client = new Client(); }
@@ -110,17 +111,27 @@ class DefaultExtension extends MProvider {
             ["tragedy", "Tragedy"], ["yaoi", "Yaoi"], ["yuri", "Yuri"]];
         const triStatePair = ([value, name]) => ({ type_name: "TriState", name, value, state: 0 });
         const triState = (name) => triStatePair([name.toLowerCase().replace(/\s+/g, "-"), name]);
+        // SortFilter.values must be an array of filter-shaped objects (not plain
+        // strings): the app's deserializer treats every values[] entry as a Map
+        // and dispatches on type_name, so a raw string here throws and silently
+        // wipes the *entire* filter list back to [] (this was the actual cause of
+        // genre filtering doing nothing in Browse -- getFilterList() was crashing
+        // on the sort values and the app was swallowing that into an empty list).
+        const sortOption = (name) => ({ type_name: "SelectOption", name, value: name.toLowerCase() });
         return [
             { type_name: "GroupFilter", name: "Genre", state: genrePairs.map(triStatePair) },
             { type_name: "GroupFilter", name: "Type", state: ["Manga", "Manhua", "Manhwa", "Novel"].map(triState) },
             { type_name: "GroupFilter", name: "Status", state: ["Cancelled", "Completed", "On Hiatus", "Ongoing", "Unknown"].map(triState) },
-            { type_name: "SortFilter", name: "Sort By", state: { index: 0, ascending: false, type_name: "SortState" }, values: ["Popular", "Rating", "Updated", "Bookmarked", "Title"] },
+            { type_name: "SortFilter", name: "Sort By", state: { index: 0, ascending: false, type_name: "SortState" }, values: ["Popular", "Rating", "Updated", "Bookmarked", "Title"].map(sortOption) },
         ];
     }
 
     async search(query, page, filters) {
         // filters arrives as the JSON-serialized state of getFilterList()'s
         // return value (TriState: 0=unused, 1=included, 2=excluded).
+        if (DEBUG_FILTERS) {
+            throw new Error(`DEBUG search() called with query=${JSON.stringify(query)} page=${page} filters=${JSON.stringify(filters)}`);
+        }
         const params = { query, orderby: "popular", order: "desc" };
         for (const f of filters || []) {
             if (f.type_name === "GroupFilter") {
