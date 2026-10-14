@@ -171,19 +171,21 @@ class DefaultExtension extends MProvider {
     }
 
     async getPageList(url) {
-        // The site has migrated CDNs at least once (kuma.kyut.dev vs the legacy
-        // rcdn.kyut.dev), and even within rcdn.kyut.dev the URL *path* shape is
-        // inconsistent across chapters of the same manga, e.g.:
-        //   rcdn.kyut.dev/images/k/kaoru-hana-wa-rin-to-saku/102/1.jpg
-        //   rcdn.kyut.dev/k/kaoru-hana-wa-rin-to-saku/chapter-140/1.jpg
-        // (no "/images/" prefix, "chapter-" prefix on the chapter number). Matching
-        // on hostname alone instead of a fixed path is more robust to these path
-        // variations; both hosts are dedicated page-image CDNs so this shouldn't
-        // pick up unrelated images.
+        // The site has migrated CDNs multiple times. Current and past hosts:
+        //   cdn.rawkuma.com   (current, e.g. https://cdn.rawkuma.com/a/<slug>/chapter-<n>/1.jpg)
+        //   kuma.kyut.dev     (legacy)
+        //   rcdn.kyut.dev     (legacy, with inconsistent path shapes across chapters)
+        // Matching on hostname (not a fixed path) is more robust to path variations;
+        // keeping every known CDN host in the check covers older chapters that may
+        // still point at a legacy CDN.
         const chapterUrl = this.absoluteUrl(url), res = await this.client.get(chapterUrl, this.getHeaders(chapterUrl)), pages = [];
         for (const image of new Document(res.body).select("img[src]")) {
             const imageUrl = image.getSrc;
-            if (imageUrl && (imageUrl.includes("kuma.kyut.dev/") || imageUrl.includes("rcdn.kyut.dev/"))) {
+            if (imageUrl && (
+                imageUrl.includes("cdn.rawkuma.com/") ||
+                imageUrl.includes("kuma.kyut.dev/") ||
+                imageUrl.includes("rcdn.kyut.dev/")
+            )) {
                 pages.push({ url: imageUrl, headers: this.getHeaders(imageUrl) });
             }
         }
